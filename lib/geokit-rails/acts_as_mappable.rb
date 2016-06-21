@@ -93,10 +93,7 @@ module Geokit
       # A proxy to an instance of a finder adapter, inferred from the connection's adapter.
       def adapter
         @adapter ||= begin
-          unless Adapters.const_defined?(connection.adapter_name.camelcase)
-            filename = connection.adapter_name.downcase
-            require File.join("geokit-rails", "adapters", filename)
-          end
+          require File.join('geokit-rails', 'adapters', connection.adapter_name.downcase)
           klass = Adapters.const_get(connection.adapter_name.camelcase)
           klass.load(self) unless klass.loaded
           klass.new(self)
@@ -107,13 +104,8 @@ module Geokit
 
       def within(distance, options = {})
         options[:within] = distance
-        # Add bounding box to speed up SQL request.
-        bounds = formulate_bounds_from_distance(
-          options,
-          normalize_point_to_lat_lng(options[:origin]), 
-          options[:units] || default_units)
-        with_latlng.where(bound_conditions(bounds)).
-          where(distance_conditions(options))
+        #geo_scope(options)
+        where(distance_conditions(options))
       end
       alias inside within
 
@@ -142,12 +134,10 @@ module Geokit
         origin  = extract_origin_from_options(options)
         units   = extract_units_from_options(options)
         formula = extract_formula_from_options(options)
+        bounds  = extract_bounds_from_options(options)
         distance_column_name = distance_sql(origin, units, formula)
-        with_latlng.order("#{distance_column_name} #{options[:reverse] ? 'DESC' : 'ASC'}")
-      end
-
-      def with_latlng
-        where("#{qualified_lat_column_name} IS NOT NULL AND #{qualified_lng_column_name} IS NOT NULL")
+        #geo_scope(options).order("#{distance_column_name} asc")
+        order("#{distance_column_name} #{options[:reverse] ? 'DESC' : 'ASC'}")
       end
 
       def closest(options = {})
